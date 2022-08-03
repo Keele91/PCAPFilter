@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+### IMPORT STATEMENTS ###
+import sys
+import pyshark
+
+def network_conversation(packet):
+   try:
+     protocol = packet.transport_layer
+     source_address = packet.ip.src
+     source_port = packet[packet.transport_layer].srcport
+     destination_address = packet.ip.dst
+     destination_port = packet[packet.transport_layer].dstport
+     return (f'{protocol} {source_address}:{source_port} --> {destination_address}:{destination_port}')
+   except AttributeError as e:
+     pass
+   
+def network_srcaddr(packet):
+   try:
+     source_address = packet.ip.src
+     return (f'{source_address}')
+   except AttributeError as e:
+     pass
+   
+def network_dstaddr(packet):
+   try:
+     destination_address = packet.ip.dst
+     return (f'{destination_address}')
+   except AttributeError as e:
+     pass
+   
+def network_dstport(packet):
+   try:
+     destination_port = packet[packet.transport_layer].dstport
+     return (f'{destination_port}')
+   except AttributeError as e:
+     pass
+   
+def PCAPramrod(pcap):
+  capture = pyshark.FileCapture(pcap)
+  print("\033[1;37;40m", pcap)
+  #field_list = []  #used for diagnostics
+  #print(dir(capture))
+  #for packet in capture:
+  #  for field in dir(packet):
+  #    if field in field_list:
+  #      pass
+  #    else:
+  #      field_list.append(field)
+  #field_list.sort()
+  #print("\033[1;32;40m\n")
+  #print(field_list)
+
+  packet_count = 0
+  smtp_important_count = 0
+  FTP_count = 0
+  SSH_count = 0
+  SMB_count = 0
+  DNS_count = 0
+  HTTP_count = 0
+  TELNET_count = 0
+  SMTP_count = 0
+  TFTP_count = 0
+  srcip_dict = {}
+  dstip_dict = {}
+  for packet in capture:
+    packet_count += 1
+    src_addr = network_srcaddr(packet)
+    dst_addr = network_dstaddr(packet)
+    if packet_count % 5000 == 1:
+      print("Working =========>", pcap,"at packet", packet_count-1)
+    if src_addr not in srcip_dict:
+      srcip_dict[src_addr] = 1
+    else: #src_addr in srcip_dict:
+      srcip_dict[src_addr] = srcip_dict.get(src_addr, 0) +1
+    dst_addr = network_dstaddr(packet)
+    if dst_addr not in dstip_dict:
+      dstip_dict[dst_addr] = 1
+    else: #dst_addr in dstip_dict:
+      dstip_dict[dst_addr] = dstip_dict.get(dst_addr, 0) +1
+  #  print(srcip_dict)
+  print("Source IPs and Count: ", srcip_dict)
+  print("Destination IPs and Count: ", dstip_dict)
+  #print(sorted(srcip_dict))
+  #print(count + " - " + str(srcip_dict[count]))
+
+  for packet in capture:
+  # smtp_important_count = 0
+    if hasattr(packet, "smtp"):
+  #   smtp_important_count = 0
+      if "Password" in str(packet.smtp):
+       print(packet_count, network_conversation(packet), packet.smtp)
+       smtp_important_count += 1
+      elif "Username" in str(packet.smtp):
+       print(packet_count, network_conversation(packet), packet.smtp)
+       smtp_important_count += 1
+  if smtp_important_count == 0:
+   print("NO VALUABLE SMPT FILES FOUND")
+
+  #   elif ".com" in str(packet.smtp):
+  #     print(packet_count) 
+  #     print(packet.smtp)
+  for packet in capture:
+  # if packet_count < 7246:
+  #  pass
+  if hasattr(packet, "http"):
+    if "Request Method: GET" in str(packet.http):
+      print(packet_count, network_conversation(packet), "HTTP GET Request URI:", packet.http.request_uri)
+
+    else:
+      pass
+  else:
+    pass
+  packet_count += 1 
+  
+  for packet in capture:
+    if network_dstport(packet) in ['20' , '21']:
+      FTP_count += 1
+      if FTP_count < 2:
+        print(packet_count, network_conversation(packet), " DSTPort:", network_dstport(packet),"\033[1;33;40m First open connection to FTP port.\33[1;37;40m")
+    elif network_dstport(packet) == '22':
+      SSH_count += 1
+      if SSH_count < 2:
+        print(packet_count, network_conversation(packet), " DSTPort:", network_dstport(packet),"\033[1;33;40m First open connection to SSH port.\33[1;37;40m")
+    elif network_dstport(packet) in ['139','137','445']:
+      SMB_count =+ 1
+      if SMB_count < 2:
+        print(packet_count, network_conversation(packet), " DSTPort:", network_dstport(packet),"\033[1;33;40m First open connection to SMB port.\33[1;37;40m")
+    elif network_dstport(packet) == '53': 
+      DNS_count += 1
+      if DNS_count < 2:
+        print(packet_count, network_conversation(packet), " DSTPort:", network_dstport(packet),"\033[1;33;40m First open connection to DNS port.\33[1;37;40m")
+    elif network_dstport(packet) in ['44' , '80' , '8080' , '8443']:
+      HTTP_count += 1
+      if HTTP_count < 2:
+        print(packet_count, network_conversation(packet), " DSTPort:", network_dstport(packet),"\033[1;33;40m First open connection to HTTP port.\33[1;37;40m")
+    elif network_dstport(packet) == '23':
+      TELNET_count += 1
+      if TELNET_count < 2:
+        print(packet_count, network_conversation(packet), " DSTPort:", network_dstport(packet),"\033[1;33;40m First open connection to TELNET port.\33[1;37;40m")
+    elif network_dstport(packet) == '25':
+      SMTP_count += 1
+      if SMTP_count < 2:
+        print(packet_count, network_conversation(packet), " DSTPort:", network_dstport(packet),"\033[1;33;40m First open connection to SMTP port.\33[1;37;40m")
+    elif network_dstport(packet) == '69':
+      TFTP_count += 1
+      if TFTP_count < 2:
+        print(packet_count, network_conversation(packet), " DSTPort:", network_dstport(packet),"\033[1;33;40m First open connection to TFTP port.\33[1;37;40m")
+    else:
+      print("PASS")
+      
+  sorted_sc
+  
+  ##DEMO OUTPUT
+  ## FILE NAME, NUMBER OF PACKETS
+  print("\033[1;32;40m", pcap, " Total Packets:", packet_count)
+  print("Source IPs and Count: ", srcip_dict) #sort top 5
+  print("Destination IPs and Count: ", dstip_dict) #sort top 5
+  if smtp_important_count == 0:
+    print("NO VALUABLE SMPT FILES FOUND")
+  print("Potentially vulnerable destination ports:")
+  print("Total FTP connections on DSTPort 20 and 21: ", FTP_count)
+  print("Total FTP connections on DSTPort 22: ", SSH_count)
+  print("Total FTP connections on DSTPort 23: ", TELNET_count)
+  print("Total FTP connections on DSTPort 25: ", SMTP_count)
+  print("Total FTP connections on DSTPort 53: ", DNS_count)
+  print("Total FTP connections on DSTPort 69: ", TFTP_count)
+  print("Total FTP connections on DSTPort 139, 137, and 445: ", SMB_count)
+  print("Total FTP connections on DSTPort 443, 80, 8080, and 8443: ", HTTP_count)
+  
+    #for packet in capture:
+  #  if packet_count < 66:
+  #    packet_count += 1
+  #  else:
+  #    print(dir(packet))
+  #    print(packet.smtp)
+  #    break
+
+def main ():
+  PCAPramrod(sys.argv[1])
+  
+  
+### DUNDER CHECK ###
+if __name__ == "__main__":
+  main()
